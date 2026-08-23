@@ -14,6 +14,8 @@ Veil turns a described physical system into a computational experiment, and prod
 
 *Validation* asks how far the model is from reality. Discrepancy against measurement, with uncertainty carried on both sides — not a single representative run compared to an experimental mean and called reasonable. This tier requires reality to compare against: published benchmarks, inter-laboratory experiments, a customer's own test campaign, or in time, a live measurement stream. Where it exists, Veil quantifies the discrepancy. Where it does not, Veil performs verification and states the limit explicitly.
 
+**The model never produces numeric metrics.** A model may propose a brief and may write interpretive prose. All numbers in a report come from deterministic computation.
+
 **Veil does not claim a model is correct.** At the verification tier it claims the model was solved to a stated accuracy and that its conclusions are or are not stable under stated perturbations. At the validation tier it claims the model is wrong by a quantified amount under stated conditions. Both are defensible. Neither is "good agreement."
 
 **Critique is Veil's function, not the user's.** Veil identifies what is structurally wrong or questionable about a proposed system — for any user, not only for someone already expert enough to catch it. A plausible result that is silently wrong is the failure mode worth engineering against. So is a quantified error the authors named and never integrated. Surfacing these is part of the argument, and Veil distinguishes real defects from transcription artifacts rather than reporting noise as a finding.
