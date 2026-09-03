@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from veil.core.brief.provenance import Provenance
-from veil.core.corrections.schema import Correction, CorrectionCategory
+from oriphim.core.brief.provenance import Provenance
+from oriphim.core.corrections.schema import Correction, CorrectionCategory
 
 # The exact, closed set of fields a Correction is allowed to carry. No field
 # here can hold the proposed or accepted value of the thing being corrected.

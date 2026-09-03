@@ -6,9 +6,9 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
-from veil.core.brief.envelope import Envelope
-from veil.core.brief.provenance import Provenance, Provenanced
-from veil.core.report.tier import Tier
+from oriphim.core.brief.envelope import Envelope
+from oriphim.core.brief.provenance import Provenance, Provenanced
+from oriphim.core.report.tier import Tier
 
 
 class _EmptyBlock(BaseModel):

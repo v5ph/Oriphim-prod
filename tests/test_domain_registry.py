@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from veil.core import domain as domain_registry
+from oriphim.core import domain as domain_registry
 
 
 def test_get_unregistered_domain_raises() -> None:
@@ -11,11 +11,22 @@ def test_get_unregistered_domain_raises() -> None:
 
 
 def test_importing_mechanical_registers_it() -> None:
-    import veil.domains.mechanical  # noqa: F401
+    import oriphim.domains.mechanical  # noqa: F401
 
     mechanical = domain_registry.get("mechanical")
     assert mechanical.name == "mechanical"
 
-    from veil.domains.mechanical.block import MechanicalBlock
+    from oriphim.domains.mechanical.block import MechanicalBlock
 
     assert mechanical.block_schema() is MechanicalBlock
+
+
+def test_importing_plasma_registers_it() -> None:
+    import oriphim.domains.plasma  # noqa: F401
+
+    plasma = domain_registry.get("plasma")
+    assert plasma.name == "plasma"
+
+    from oriphim.domains.plasma.block import PlasmaBlock
+
+    assert plasma.block_schema() is PlasmaBlock

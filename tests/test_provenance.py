@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from veil.core.brief.provenance import Provenance, Provenanced
+from oriphim.core.brief.provenance import Provenance, Provenanced
 
 
 def test_stated_value_round_trips() -> None:

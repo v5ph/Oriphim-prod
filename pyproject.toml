@@ -3,15 +3,16 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "veil"
+name = "oriphim"
 version = "0.1.0"
-description = "Veil turns a described physical system into a computational experiment, and produces the evidence needed to judge whether its results can be believed."
+description = "oriphim turns a described physical system into a computational experiment, and produces the evidence needed to judge whether its results can be believed."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
 dependencies = [
     "pydantic>=2.6",
     "typer>=0.12",
+    "pypdf>=4.0",
 ]
 
 [project.optional-dependencies]
@@ -22,10 +23,13 @@ dev = [
 ]
 
 [project.scripts]
-veil = "veil.cli:app"
+oriphim = "oriphim.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+oriphim = ["assets/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

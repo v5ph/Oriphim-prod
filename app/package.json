@@ -1,0 +1,37 @@
+{
+  "name": "oriphim-app",
+  "productName": "oriphim",
+  "version": "0.1.0",
+  "description": "oriphim desktop shell",
+  "author": "Oriphim",
+  "private": true,
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && electron-builder --mac --arm64",
+    "typecheck": "tsc --noEmit"
+  },
+  "build": {
+    "appId": "com.oriphim.app",
+    "productName": "oriphim",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist-web/**/*",
+      "dist-electron/**/*"
+    ],
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.developer-tools"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "electron": "^44.1.1",
+    "electron-builder": "^26.15.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vite-plugin-electron": "^1.1.2"
+  }
+}

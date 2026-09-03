@@ -10,7 +10,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-_SRC = Path(__file__).resolve().parents[1] / "src" / "veil"
+_SRC = Path(__file__).resolve().parents[1] / "src" / "oriphim"
 _CORE = _SRC / "core"
 _INTERPRET = _CORE / "interpret"
 
@@ -43,9 +43,9 @@ def test_core_never_imports_domains() -> None:
     violations = []
     for path in _python_files(_CORE):
         for name in _qualified_imports(path):
-            if name == "veil.domains" or name.startswith("veil.domains."):
+            if name == "oriphim.domains" or name.startswith("oriphim.domains."):
                 violations.append((path, name))
-    assert not violations, f"core/ modules must never import veil.domains: {violations}"
+    assert not violations, f"core/ modules must never import oriphim.domains: {violations}"
 
 
 def test_only_interpret_imports_the_model_client() -> None:
@@ -54,10 +54,10 @@ def test_only_interpret_imports_the_model_client() -> None:
         if _INTERPRET in path.parents:
             continue  # core/interpret/ is allowed to import its own client
         for name in _qualified_imports(path):
-            if name == "veil.core.interpret.client" or name.startswith(
-                "veil.core.interpret.client."
+            if name == "oriphim.core.interpret.client" or name.startswith(
+                "oriphim.core.interpret.client."
             ):
                 violations.append((path, name))
     assert not violations, (
-        f"Only veil.core.interpret may import the model client: {violations}"
+        f"Only oriphim.core.interpret may import the model client: {violations}"
     )

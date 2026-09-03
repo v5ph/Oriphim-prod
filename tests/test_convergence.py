@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from veil.core.checks.convergence import grid_convergence_index
+from oriphim.core.checks.convergence import grid_convergence_index
 
 # Published worked example: pressure recovery for a supersonic ramp inlet,
 # NPARC Alliance CFD Verification and Validation Web Site, "Examining

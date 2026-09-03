@@ -1,5 +1,5 @@
-veil/
-├── src/veil/
+oriphim/
+├── src/oriphim/
 │   ├── brief/            THE PRODUCT
 │   │   ├── schema.py       domain-general: objective, assumptions,
 │   │   │                   QoI, checks planned, tier
@@ -13,7 +13,8 @@ veil/
 │   │
 │   ├── interpret/        THE ONLY PLACE THAT CALLS A MODEL
 │   │   ├── client.py       provider-agnostic
-│   │   └── propose.py      prose → draft brief (typed out, never prose)
+│   │   ├── ingest.py       document → text (pdf, html)
+│   │   └── propose.py      prose + paper text → draft brief (typed out, never prose)
 │   │
 │   ├── execute/          THE SEAM
 │   │   ├── contract.py     brief → results; never assumes same process
@@ -27,11 +28,25 @@ veil/
 │   │   ├── conservation.py
 │   │   └── dimensional.py
 │   │
+│   ├── render/            SCENE + DATA → exhibit
+│   │   ├── scene.py         SCENE schema (model-written, declarative)
+│   │   ├── data.py          DATA schema (solver output; never model-written)
+│   │   ├── link.py          scene ↔ data cross-check
+│   │   ├── stamp.py         renderer version + hashes + resolved scale
+│   │   └── bundle.py        self-contained HTML for the webview / export
+│   │
 │   ├── report/
 │   │   ├── tier.py         VERIFICATION | VALIDATION, never both
 │   │   └── assemble.py
 │   │
 │   ├── store/              runs, artifacts, hashing
+│   ├── assets/             oriphim-render-1.0.0.js — vendored, audited, never regenerated
 │   └── cli.py
+├── app/                    THE DESKTOP SHELL — Electron + Vite + TypeScript
+│   ├── electron/main.ts      frameless BrowserWindow, app lifecycle, native dialogs
+│   ├── electron/preload.ts   window.oriphim — the seam to the Python engine (stubbed)
+│   ├── src/main.ts           the renderer (interaction only; talks to window.oriphim)
+│   ├── src/app.css           VS-Code-grey palette, IBM Plex Mono, Jacquard 12 wordmark
+│   └── index.html            three panes under a custom title bar
 ├── benchmarks/             known-answer systems
 └── tests/
