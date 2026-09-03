@@ -28,6 +28,9 @@ class MechanicalDomain:
     def block_schema(self) -> type[BaseModel]:
         return MechanicalBlock
 
+    def spec_schema(self) -> type[BaseModel]:
+        raise NotImplementedError  # picked when a mechanical run needs a RunSpec
+
     def solve(self, brief: Envelope[Any]) -> Any:
         return solver_module.solve(brief)
 

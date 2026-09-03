@@ -3,52 +3,61 @@
 Every physical system Oriphim can pose and solve, it can render. Not as a feature bolted
 onto certain domains, but as a consequence of how the pipeline is shaped: rendering is
 strictly downstream of DATA, and DATA is physics-agnostic. This document is the
-domain-general contract for that. `docs/standards/scene-spec.md` is the format the fixed
-renderer consumes; this is the story of how a described system reaches it.
+domain-general contract for that. `docs/standards/run-spec.md` is the format the model
+fills to set up a run; `docs/standards/scene-spec.md` is the format the fixed renderer
+consumes; this is the story of how a described system reaches both.
 
 ---
 
-## Why it generalizes
+## The split — a verified core, and declarative glue
 
-The renderer draws exactly three things:
+Oriphim is not a wrapper around a model that writes simulators. The numerics — the part
+of a run that is *right or wrong* rather than *rough or sharp* — are Oriphim's, written
+once and verified once against convergence, conservation, and known limits. That body of
+code is **the verified core**.
 
-- a **rigid body** — a centre that moves, drawn as a lit shell of a given radius;
-- a set of **points** — one element each, optionally coloured by a scalar;
-- a **polyline** — a path, optionally widened into a ribbon.
+What the model supplies, per run, is **glue**: a bounded, typed description of *this*
+system — grid, duration, species, driver, what to record. It is a document, not a
+program. The model states what to integrate and over what; it never writes the
+integrator. The test this passes that "let the model write the solver" does not: swap in
+a weaker model and the output gets rougher — a clumsier scene, a missed diagnostic —
+never *wrong*. A wrong timestep is not reachable from here, because the timestep is not
+the model's to set.
 
-Nothing in that list is about plasma, or structures, or orbits. A point is a point
-whether it is a PIC macroparticle, a finite-element node, a marker on a glacier surface,
-a vertex of a cardiac mesh, a gravitating mass, or a parcel of accretion-disc fluid. A
-polyline is a polyline whether it traces a magnetic field line, a bending beam's
-neutral axis, a contaminant plume centreline, or a planetary orbit. The scalar carried
-alongside a point track is temperature, or von Mises stress, or hydraulic head, or
-specific orbital energy — the renderer neither knows nor cares.
+The glue takes one of two forms:
 
-So the reach of the visualization is exactly the reach of the solver. If Oriphim can
-produce frames of positions for a system, it can show that system. The work of
-generalizing rendering to a new field is not renderer work; it is deciding which
-physical things become which track kind, and which quantities become scalars.
+- **A RunSpec** (`docs/standards/run-spec.md`) — the main path. A schema-validated object:
+  every key is something the core supports, and `extra="forbid"` means a key the core
+  does not recognise is a validation error, not a silently honoured instruction. The
+  model fills it; `bind` checks it against the approved brief; the core runs it.
+- **Escape-hatch code** — the minority path. When a run genuinely needs something the
+  RunSpec cannot say, the model writes a small module *against the core API* (it calls
+  the core's verified pieces; it does not reimplement them). It is flagged for human
+  review — `bind` refuses to run glue with no reviewer's name on it — and it runs
+  sandboxed, like any solver. Most runs never touch this.
 
 ---
 
 ## The pipeline, end to end
 
 ```
-brief  ──►  governing equations  ──►  solver  ──►  DATA  ──►  checks  ──►  SCENE  ──►  renderer  ──►  exhibit
-        (Oriphim's interpretation)   (model-      (fixed    (verification)  (model-    (vendored,
-                                      written,     schema)                   written,   audited
-                                      verified,                              declarative) 1.0.0)
-                                      sandboxed)
+brief  ──►  RunSpec  ──►  verified core  ──►  DATA  ──►  checks  ──►  SCENE  ──►  renderer  ──►  exhibit
+        (model-written,  (Oriphim's;       (fixed    (verification) (model-      (vendored,
+         declarative,     verified once,    schema)                  written,     audited
+         schema-checked)  sandboxed run)                             declarative) 1.0.0)
 ```
 
-- **Governing equations** are already Oriphim's job — the interpretation step identifies
-  what system is posed and what equations govern it.
-- **The solver** is code the model writes to integrate those equations. It runs in a
-  sandboxed subprocess (no network; CPU, memory, and wall-time capped; a scratch
-  directory and nothing else). It is subject to every verification check the tier
-  permits — convergence under refinement, conservation, integrator cross-agreement.
-  Model-written solver code is verified code. This is the reason the split exists.
-- **DATA** is the solver's output in one fixed schema: named tracks, each a list of
+- **The brief** is Oriphim's interpretation of the paper: what system is posed, what
+  equations govern it, what will be checked. Reviewed and approved by a human first.
+- **The RunSpec** is the model's setup for the run — resolved numbers, one normalization,
+  concrete species and driver, the diagnostics to record. Declarative. Cross-checked
+  against the brief it was built from (`oriphim.core.execute.bind`): same run, approved,
+  current revision, same domain.
+- **The verified core** consumes the RunSpec and integrates the governing equations. It
+  chooses the timestep from a stability criterion; it owns the refinement ladder the
+  convergence check needs. It runs in a sandboxed subprocess — no network; CPU, memory,
+  and wall-time capped; a scratch directory and nothing else.
+- **DATA** is the core's output in one fixed schema: named tracks, each a list of
   per-frame position arrays, with optional per-frame per-element scalar arrays.
 - **Checks** run against DATA, not against a picture. A figure that displays a quantity
   is only admitted to a report after the section containing the checks that cover that
@@ -59,34 +68,34 @@ brief  ──►  governing equations  ──►  solver  ──►  DATA  ─�
   regenerated, never edited to fit a run. A new capability means a new version and a new
   audit, not model-authored rendering code.
 
-Where the model is free: the equations, the discretization, the solver approach, and the
-SCENE. Where it is not: it never writes the renderer, and it never invents a position.
-Anything that moves in the exhibit moved because the solver put it there.
+Where the model is free: the RunSpec and the SCENE — both declarative, both bounded by a
+schema. Where it is not: it never writes the core, it never writes the renderer, and it
+never invents a position. Anything that moves in the exhibit moved because the core put
+it there.
 
 ---
 
-## The solver → DATA adapter
+## The core → DATA adapter
 
-The model's solver does not hand-write DATA JSON. It fills a fixed `solve()` contract
-that returns arrays — positions per track per step, and any scalars alongside — and a
-vendored adapter serializes those to the DATA schema. The adapter enforces what the
-renderer relies on:
+The core does not hand-write DATA JSON. It fills a fixed `solve()` contract that returns
+arrays — positions per track per step, and any scalars alongside — and a vendored adapter
+serializes those to the DATA schema. The adapter enforces what the renderer relies on:
 
 - element count per track is constant across frames (1.0.0);
 - every scalar array is parallel to its track's positions;
 - `frames` matches the number of position frames on every track;
-- units are the solver's own; the SCENE's `world.scale` (or `fit: "once"`) maps them
-  into the render box, resolved once and recorded in the stamp.
+- units are the core's own; the SCENE's `world.scale` (or `fit: "once"`) maps them into
+  the render box, resolved once and recorded in the stamp.
 
-Keeping DATA emission in a fixed adapter rather than in model-written code means the
-schema is enforced by audited code, and the model only has to produce numbers.
+Keeping DATA emission in a fixed adapter means the schema is enforced by audited code,
+and the core only has to produce numbers.
 
 ---
 
 ## Mapping physical things to tracks — by field
 
-The roadmap order, with the concrete mapping for each. "Not in 1.0.0" columns are the
-honest gaps — where a report says so in its *checks not applied* section rather than
+The roadmap order, with the concrete mapping for each. "Not in 1.0.0" rows are the honest
+gaps — where a report says so in its *checks not applied* section rather than
 substituting a figure that implies more than it shows.
 
 ### Climate and geophysics

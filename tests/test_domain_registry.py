@@ -28,5 +28,7 @@ def test_importing_plasma_registers_it() -> None:
     assert plasma.name == "plasma"
 
     from oriphim.domains.plasma.block import PlasmaBlock
+    from oriphim.domains.plasma.spec import PlasmaSpecBlock
 
     assert plasma.block_schema() is PlasmaBlock
+    assert plasma.spec_schema() is PlasmaSpecBlock

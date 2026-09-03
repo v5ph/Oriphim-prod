@@ -1,10 +1,26 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 
 /**
- * The seam between the renderer and the Oriphim engine. Everything except the
- * native file dialog is stubbed until the Python side (a local FastAPI process)
- * is wired in — the renderer already degrades to canned responses.
+ * The seam between the renderer and the Oriphim engine. The engine runs as a
+ * local sidecar the main process manages (see main.ts); every call here is
+ * proxied through IPC and comes back as a discriminated result — a rejected
+ * promise never crosses this boundary.
  */
+
+export interface EngineError {
+  kind: string;
+  message: string;
+}
+export type ProposeResult =
+  | { ok: true; brief: unknown; reviewDebt: [number, number] }
+  | { ok: false; error: EngineError };
+export type ApproveResult = { ok: true; brief: unknown } | { ok: false; error: EngineError };
+export interface EngineStatus {
+  online: boolean;
+  port: number | null;
+  modelConfigured: boolean;
+}
+
 const bridge = {
   platform: process.platform as NodeJS.Platform,
 
@@ -12,18 +28,25 @@ const bridge = {
   openPaper: (): Promise<{ path: string; name: string } | null> =>
     ipcRenderer.invoke("oriphim:openPaper"),
 
-  /** prose (+ optional paper) -> draft run brief. Stubbed. */
-  propose: async (
-    description: string,
-    paperPath?: string,
-  ): Promise<{ wired: false; description: string; paperPath: string | null; message: string }> => ({
-    wired: false,
-    description,
-    paperPath: paperPath ?? null,
-    message:
-      "The interpretation step isn't connected to this shell yet. When it is, the draft run " +
-      "brief appears in the right pane — provenance-marked, nothing executed until you approve it.",
-  }),
+  /** The real filesystem path of a dropped File (Electron removed File.path). */
+  getPathForFile: (file: File): string => webUtils.getPathForFile(file),
+
+  /** Is the engine up, and does it have model credentials? */
+  engineStatus: (): Promise<EngineStatus> => ipcRenderer.invoke("oriphim:status"),
+
+  /** The reviewer's name (git config user.name), for the approval record. */
+  reviewer: (): Promise<string> => ipcRenderer.invoke("oriphim:reviewer"),
+
+  /** prose (+ optional paper path) -> draft run brief. */
+  propose: (description: string, paperPath?: string | null): Promise<ProposeResult> =>
+    ipcRenderer.invoke("oriphim:propose", { description, paperPath: paperPath ?? null }),
+
+  /** Lock a reviewed brief: edited envelope + valueless correction records. */
+  approve: (args: {
+    brief: unknown;
+    corrections: unknown[];
+    approvedBy: string;
+  }): Promise<ApproveResult> => ipcRenderer.invoke("oriphim:approve", args),
 };
 
 contextBridge.exposeInMainWorld("oriphim", bridge);

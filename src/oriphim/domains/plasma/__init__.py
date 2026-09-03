@@ -5,9 +5,9 @@ mechanical domain. There is no plugin-discovery system: a caller (currently
 `oriphim.cli`) imports this module directly, and that import is what makes the
 domain available.
 
-Only `block_schema` is real in this slice — enough to give the interpretation
-step a typed home for what it extracts from a plasma paper. `solve`, `checks`,
-`benchmarks`, and `priors` are picked by a run that needs them.
+`block_schema` types what the interpreter extracts from a plasma paper;
+`spec_schema` types the declarative run setup the LLM fills after approval.
+`solve`, `checks`, `benchmarks`, and `priors` are picked by a run that needs them.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from oriphim.core import domain as domain_registry
 from oriphim.core.brief.envelope import Envelope
 from oriphim.core.checks.base import Check
 from oriphim.domains.plasma.block import PlasmaBlock
+from oriphim.domains.plasma.spec import PlasmaSpecBlock
 
 
 class PlasmaDomain:
@@ -29,6 +30,9 @@ class PlasmaDomain:
 
     def block_schema(self) -> type[BaseModel]:
         return PlasmaBlock
+
+    def spec_schema(self) -> type[BaseModel]:
+        return PlasmaSpecBlock
 
     def solve(self, brief: Envelope[Any]) -> Any:
         raise NotImplementedError

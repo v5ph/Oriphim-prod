@@ -35,6 +35,14 @@ class Domain(Protocol):
         """The Pydantic model type for this domain's brief block."""
         ...
 
+    def spec_schema(self) -> type[BaseModel]:
+        """The Pydantic model type for this domain's run-spec block.
+
+        The counterpart to `block_schema`: that types the brief, this types the
+        setup the LLM fills after approval (see `oriphim.core.execute.spec`).
+        """
+        ...
+
     def solve(self, brief: Envelope[Any]) -> Any:
         """Run the domain's solver against an approved brief."""
         ...

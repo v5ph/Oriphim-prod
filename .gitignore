@@ -1,6 +1,9 @@
 claude.md
 agents.md
 
+.env
+.oriphim-workspace/
+
 __pycache__/
 *.pyc
 *.egg-info/

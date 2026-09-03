@@ -55,11 +55,16 @@
   <div class="scrim" hidden></div>
 
   <section class="chat" aria-label="Conversation">
+    <div class="chat-views" id="chat-views" hidden>
+      <button type="button" class="chat-view" data-view="thread" aria-pressed="false">Thread</button>
+      <button type="button" class="chat-view" data-view="brief" aria-pressed="true">Brief</button>
+    </div>
     <div class="transcript" id="transcript" role="log" aria-live="polite" aria-label="Messages">
       <div class="empty-note" id="empty-note">
         <p class="empty-head">Let the <span class="chaos">chaos</span> begin</p>
       </div>
     </div>
+    <section class="brief" id="brief" aria-label="Run brief" hidden></section>
     <form class="composer" id="composer" autocomplete="off">
       <div class="attach-row" id="attach-row" hidden>
         <span class="attach-chip">
@@ -88,7 +93,7 @@
 </div>
 
 <div class="statusbar">
-  <span class="sb-item"><span class="sb-dot" id="sb-dot" aria-hidden="true"></span>gemini-3.6-flash</span>
+  <span class="sb-item"><span class="sb-dot" id="sb-dot" aria-hidden="true"></span><span id="sb-engine">engine starting…</span></span>
   <span class="sb-item">verification tier</span>
   <span class="sb-spacer"></span>
   <span class="sb-item" id="sb-run">no active run</span>

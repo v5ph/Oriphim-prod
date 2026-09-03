@@ -344,11 +344,38 @@ body.rail-collapsed.ctx-collapsed .workspace { grid-template-columns: 0 1fr 0; }
 .chat {
   grid-column: 2;
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
   background: var(--bg);
 }
+
+/* thread ⇄ brief switch — only visible once a brief exists */
+.chat-views {
+  grid-row: 1;
+  display: flex;
+  gap: 4px;
+  padding: 8px 28px 0;
+}
+.chat-views[hidden] { display: none; }
+.chat-view {
+  padding: 4px 10px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-sm);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.chat-view:hover { color: var(--paper-dim); }
+.chat-view[aria-pressed="true"] {
+  background: var(--active);
+  border-color: var(--focus);
+  color: var(--paper);
+}
+#transcript, .brief { grid-row: 2; }
+#transcript[hidden], .brief[hidden] { display: none; }
+.composer { grid-row: 3; }
 
 .transcript {
   display: flex;
@@ -754,6 +781,160 @@ body.rail-collapsed.ctx-collapsed .workspace { grid-template-columns: 0 1fr 0; }
   font-size: 12px;
 }
 .rename-input:focus { outline: none; box-shadow: inset 0 0 0 1px var(--focus); }
+
+/* ---------- brief review (center takeover) ---------- */
+.brief {
+  overflow-y: auto;
+  padding: 20px 28px 40px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--edge) transparent;
+}
+.brief::-webkit-scrollbar { width: 9px; }
+.brief::-webkit-scrollbar-thumb { background: var(--edge); border-radius: 4px; }
+
+.brief-doc {
+  max-width: 720px;
+  font-family: var(--font-sans);
+  color: var(--paper);
+}
+
+.brief-head { padding-bottom: 14px; border-bottom: 1px solid var(--edge-soft); }
+.brief-title { font-size: 20px; font-weight: 600; line-height: 1.25; }
+.brief-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.brief-chip {
+  padding: 2px 7px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  font-family: var(--font);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-dim);
+}
+.brief-chip.brief-tier { border-color: var(--rust); color: var(--rust-tint); }
+.brief-chip.brief-id { text-transform: none; letter-spacing: 0.04em; color: var(--paper-faint); }
+.brief-debt { margin-top: 11px; font-size: 12px; line-height: 1.6; color: var(--paper-dim); }
+
+.prov-legend { display: flex; gap: 6px; margin-top: 10px; }
+.prov {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-family: var(--font);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+.prov-stated { background: rgba(255, 255, 255, 0.06); color: var(--paper-dim); }
+.prov-inferred { background: rgba(224, 86, 42, 0.16); color: var(--rust-tint); border-color: rgba(224, 86, 42, 0.4); }
+.prov-defaulted { background: rgba(90, 162, 90, 0.14); color: var(--ok); }
+.prov-corrected { background: rgba(90, 162, 90, 0.16); color: var(--ok); border-color: rgba(90, 162, 90, 0.45); }
+
+.brief-section { margin-top: 22px; }
+.brief-section-title {
+  font-family: var(--font);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  margin-bottom: 8px;
+}
+.brief-list { display: flex; flex-direction: column; gap: 8px; }
+.brief-item { font-size: 13px; line-height: 1.55; color: var(--paper); }
+.brief-item-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.brief-item-line .brief-edit { flex: 1; min-width: 12ch; }
+.brief-item-line .brief-badge-host { align-self: center; }
+
+/* inline editables — a quiet affordance until hovered or focused */
+.brief-edit {
+  border-radius: var(--r-sm);
+  border-bottom: 1px dashed transparent;
+  transition: background 0.12s ease, border-color 0.12s ease;
+  cursor: text;
+}
+.brief-edit:hover { border-bottom-color: var(--edge); }
+.brief-edit:focus {
+  outline: none;
+  background: var(--field);
+  border-bottom-color: var(--focus);
+  box-shadow: 0 1px 0 var(--focus);
+}
+.brief-edit[contenteditable="false"] { cursor: default; border-bottom-color: transparent; }
+.brief-edit[contenteditable="false"]:hover { background: transparent; }
+.brief-doc.is-locked .brief-edit:hover { border-bottom-color: transparent; }
+
+.brief-title.brief-edit { display: block; font-size: 20px; font-weight: 600; line-height: 1.25; }
+.brief-para.brief-edit { display: block; white-space: pre-wrap; padding: 2px 0; }
+
+.brief-cat {
+  align-self: center;
+  padding: 2px 5px;
+  border: 1px solid rgba(224, 86, 42, 0.5);
+  border-radius: var(--r-sm);
+  background: var(--field);
+  color: var(--paper-dim);
+  font-family: var(--font);
+  font-size: 9.5px;
+}
+.brief-cat[hidden] { display: none; }
+
+.brief-tier-select {
+  border: 1px solid var(--rust);
+  background: transparent;
+  color: var(--rust-tint);
+  cursor: pointer;
+}
+.brief-tier-select:disabled { cursor: default; opacity: 0.7; }
+.brief-note {
+  margin-top: 3px;
+  padding-left: 2px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--paper-faint);
+  border-left: 2px solid var(--edge);
+  padding-left: 9px;
+}
+.brief-kv { font-family: var(--font); font-size: 12px; color: var(--paper-dim); }
+.brief-empty { font-size: 11px; font-style: italic; color: var(--paper-faint); }
+
+.brief-sub { margin-top: 14px; }
+.brief-sub-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--paper-dim);
+  margin-bottom: 6px;
+}
+.brief-para { font-size: 12.5px; line-height: 1.6; color: var(--paper); white-space: pre-wrap; }
+
+.brief-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 28px;
+  padding-top: 14px;
+  border-top: 1px solid var(--edge-soft);
+}
+.brief-status { flex: 1; font-size: 11px; color: var(--paper-faint); }
+.brief-approve {
+  padding: 7px 16px;
+  border: 1px solid var(--rust);
+  border-radius: var(--r);
+  background: var(--rust);
+  color: var(--paper);
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.brief-approve:hover:not(:disabled) { background: var(--rust-bright); }
+.brief-approve:disabled { opacity: 0.4; cursor: default; }
+
+.brief-doc.is-locked .brief-approve { display: none; }
+.brief-doc.is-locked .brief-status { color: var(--ok); }
+
+body.engine-offline .sb-dot { background: var(--paper-faint); box-shadow: none; }
 
 /* ---------- narrow: collapse panes, rail overlays ---------- */
 .scrim {

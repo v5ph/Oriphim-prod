@@ -16,10 +16,9 @@ oriphim/
 │   │   ├── ingest.py       document → text (pdf, html)
 │   │   └── propose.py      prose + paper text → draft brief (typed out, never prose)
 │   │
-│   ├── execute/          THE SEAM
-│   │   ├── contract.py     brief → results; never assumes same process
-│   │   ├── calculix.py
-│   │   └── local.py
+│   ├── execute/          THE SEAM — approved brief → run
+│   │   ├── spec.py         RunSpec: the declarative setup the LLM fills — never solver code
+│   │   └── bind.py         RunSpec ↔ approved-brief cross-check
 │   │
 │   ├── checks/           VERIFICATION TIER
 │   │   ├── convergence.py  refinement + GCI
@@ -41,7 +40,8 @@ oriphim/
 │   │
 │   ├── store/              runs, artifacts, hashing
 │   ├── assets/             oriphim-render-1.0.0.js — vendored, audited, never regenerated
-│   └── cli.py
+│   ├── cli.py
+│   └── api.py              THE DESKTOP BRIDGE — FastAPI over the engine, spawned as a sidecar
 ├── app/                    THE DESKTOP SHELL — Electron + Vite + TypeScript
 │   ├── electron/main.ts      frameless BrowserWindow, app lifecycle, native dialogs
 │   ├── electron/preload.ts   window.oriphim — the seam to the Python engine (stubbed)

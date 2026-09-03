@@ -2,6 +2,13 @@
 // through `window.oriphim` (see electron/preload.ts); most of it is still
 // stubbed, so the composer echoes a canned reply.
 import "./app.css";
+import {
+  renderBrief,
+  sampleBrief,
+  type ApprovePayload,
+  type BriefController,
+  type BriefDoc,
+} from "./brief";
 
 // ---- dom helpers -------------------------------------------------------
 const $ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document): T | null =>
@@ -57,6 +64,7 @@ interface Run {
   title: string;
   bucket: Bucket;
   projectId: string | null;
+  brief?: BriefDoc; // the last draft the engine returned for this run, if any
 }
 
 const SEED_PROJECTS: Project[] = [
@@ -82,6 +90,7 @@ const BUCKETS: Bucket[] = ["Today", "Yesterday", "This week", "Earlier"];
 
 let projects: Project[] = store.get<Project[]>("projects", SEED_PROJECTS);
 let runs: Run[] = store.get<Run[]>("runs", SEED_RUNS);
+let activeRunId: string | null = null;
 function persist(): void {
   store.set("projects", projects);
   store.set("runs", runs);
@@ -128,7 +137,7 @@ function makeRunRow(r: Run, flashId?: string): HTMLLIElement {
   name.textContent = cap(r.title);
   name.title = r.title;
   btn.appendChild(name);
-  btn.addEventListener("click", () => selectItem(btn, r.title, r.title));
+  btn.addEventListener("click", () => selectRun(r, btn));
   btn.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     openRunMenu(e, r);
@@ -439,16 +448,20 @@ function setCrumb(text: string): void {
   crumb.textContent = text;
 }
 
-function selectItem(itemEl: HTMLElement, label: string, title: string): void {
+function selectRun(run: Run, itemEl: HTMLElement): void {
   document.querySelectorAll(".rail-item.is-active").forEach((n) => n.classList.remove("is-active"));
   itemEl.classList.add("is-active");
-  setCrumb(title);
-  resetThread();
-  addMessage(
-    "oriphim",
-    `Opened “${label}”. This shell isn't wired to stored runs yet — start a new prompt below.`,
-  );
+  activeRunId = run.id;
+  setCrumb(run.title);
   closeDrawer();
+  if (run.brief) {
+    openBrief(run.brief, { attachToRun: false });
+    runStatus.textContent = run.brief.approved_by ? "brief approved" : "draft brief — review";
+  } else {
+    exitBrief();
+    resetThread();
+    addMessage("oriphim", `Opened “${run.title}”. Send a prompt below to draft its brief.`);
+  }
 }
 function activateItemById(id: string): void {
   // make sure the target is on screen: open its folder / uncollapse its section
@@ -474,6 +487,108 @@ function activateItemById(id: string): void {
   btn.scrollIntoView({ block: "nearest" });
 }
 
+// ---- brief review: the center takeover ---------------------------
+const briefEl = el("#brief");
+const chatViews = el("#chat-views");
+let briefCtl: BriefController | null = null;
+
+type ChatView = "thread" | "brief";
+function setChatView(view: ChatView): void {
+  transcript.hidden = view !== "thread";
+  briefEl.hidden = view !== "brief";
+  chatViews.querySelectorAll<HTMLButtonElement>(".chat-view").forEach((b) => {
+    b.setAttribute("aria-pressed", String(b.dataset["view"] === view));
+  });
+}
+function openBrief(doc: BriefDoc, opts: { attachToRun?: boolean } = {}): void {
+  briefCtl = renderBrief(briefEl, doc, {
+    onApprove: window.oriphim?.approve ? approveBrief : undefined,
+  });
+  document.body.classList.add("reviewing");
+  chatViews.hidden = false;
+  setChatView("brief");
+  setCrumb(doc.title);
+  if (opts.attachToRun ?? true) {
+    const run = runs.find((r) => r.id === activeRunId);
+    if (run) {
+      run.title = doc.title;
+      run.brief = doc;
+      persist();
+      renderRail();
+    }
+  }
+}
+function exitBrief(): void {
+  document.body.classList.remove("reviewing");
+  chatViews.hidden = true;
+  briefEl.innerHTML = "";
+  briefCtl = null;
+  setChatView("thread");
+}
+chatViews.querySelectorAll<HTMLButtonElement>(".chat-view").forEach((b) => {
+  b.addEventListener("click", () => setChatView(b.dataset["view"] === "brief" ? "brief" : "thread"));
+});
+
+async function approveBrief(payload: ApprovePayload): Promise<boolean> {
+  const bridge = window.oriphim;
+  if (!bridge?.approve) return false;
+
+  const suggested = (await bridge.reviewer?.()) ?? "reviewer";
+  let approvedBy = suggested;
+  try {
+    const who = window.prompt("Approve this brief as:", suggested);
+    if (who === null) return false; // cancelled
+    approvedBy = who.trim() || suggested;
+  } catch {
+    /* prompt() unavailable in this context — approve as the git-config reviewer */
+  }
+
+  runStatus.textContent = "approving…";
+  const res = await bridge.approve({
+    brief: payload.brief,
+    corrections: payload.corrections,
+    approvedBy,
+  });
+  if (!res.ok) {
+    runStatus.textContent = "approve failed";
+    addMessage("oriphim", engineErrorText(res.error));
+    setChatView("thread");
+    return false;
+  }
+
+  const approved = res.brief as BriefDoc;
+  briefCtl?.lock(approved.approved_by ?? approvedBy, approved.approved_at ?? new Date().toISOString());
+  const run = runs.find((r) => r.id === activeRunId);
+  if (run) {
+    run.brief = approved;
+    run.title = approved.title;
+    persist();
+    renderRail();
+  }
+  runStatus.textContent = "brief approved";
+  return true;
+}
+
+interface EngineError {
+  kind: string;
+  message: string;
+}
+function engineErrorText(e: EngineError): string {
+  switch (e.kind) {
+    case "offline":
+    case "unreachable":
+      return "The engine isn't running. Check the repo's .venv is set up, then restart the app.";
+    case "model":
+      return `The model step failed — ${e.message}`;
+    case "propose":
+      return `The draft didn't validate, even after a repair pass — ${e.message}`;
+    case "paper":
+      return `Couldn't read that paper — ${e.message}`;
+    default:
+      return `Engine error (${e.kind}) — ${e.message}`;
+  }
+}
+
 // ---- composer + draft persistence ---------------------------------
 const form = el<HTMLFormElement>("#composer");
 const promptEl = el<HTMLTextAreaElement>("#prompt");
@@ -488,7 +603,7 @@ const syncSend = (): void => {
 
 promptEl.value = store.get<string>("draft", "");
 
-function submitPrompt(): void {
+async function submitPrompt(): Promise<void> {
   const text = promptEl.value.trim();
   if (!text) return;
   addMessage("user", text, { attach: staged });
@@ -496,25 +611,47 @@ function submitPrompt(): void {
   store.del("draft");
   autoGrow();
   syncSend();
-  clearAttachment();
   const words = text.split(/\s+/);
   setCrumb(words.slice(0, 6).join(" ") + (words.length > 6 ? "…" : ""));
   runStatus.textContent = "reading…";
   sbDot.classList.add("is-active");
+  const pending = addMessage("oriphim", "Reading the system…", { pending: true });
+  setChatView("thread");
 
-  const pending = addMessage("oriphim", "Reading…", { pending: true });
+  const bridge = window.oriphim;
+  if (bridge?.propose) {
+    const res = await bridge.propose(text, stagedPath);
+    sbDot.classList.remove("is-active");
+    clearAttachment();
+    if (res.ok) {
+      pending.remove();
+      openBrief(res.brief as BriefDoc);
+      runStatus.textContent = "draft brief — review";
+    } else {
+      pending.classList.remove("is-pending");
+      const body = pending.querySelector(".msg-body");
+      if (body) body.textContent = engineErrorText(res.error);
+      transcript.scrollTop = transcript.scrollHeight;
+      runStatus.textContent = "engine error";
+      if (res.error.kind === "offline" || res.error.kind === "unreachable") void reflectEngine();
+    }
+    return;
+  }
+
+  // browser preview: no engine bridge, keep a canned reply
+  clearAttachment();
   window.setTimeout(() => {
     pending.classList.remove("is-pending");
     const body = pending.querySelector(".msg-body");
     if (body) {
       body.textContent =
-        "The interpretation step isn't connected to this shell yet. When it is, the draft run " +
-        "brief appears in the right pane — provenance-marked, nothing executed until you approve it.";
+        "This is the browser preview — the engine bridge isn't available here. Launch the " +
+        "desktop app (npm run dev) to draft a real brief.";
     }
     transcript.scrollTop = transcript.scrollHeight;
-    runStatus.textContent = "draft brief — not wired";
+    runStatus.textContent = "preview — no engine";
     sbDot.classList.remove("is-active");
-  }, 700);
+  }, 600);
 }
 
 promptEl.addEventListener("input", () => {
@@ -525,12 +662,12 @@ promptEl.addEventListener("input", () => {
 promptEl.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
-    submitPrompt();
+    void submitPrompt();
   }
 });
 form.addEventListener("submit", (e) => {
   e.preventDefault();
-  submitPrompt();
+  void submitPrompt();
 });
 
 // ---- attachment: file picker + drag-and-drop --------------------
@@ -539,16 +676,19 @@ const attachRow = el("#attach-row");
 const attachName = el("#attach-name");
 const dropOverlay = el("#drop-overlay");
 const ACCEPT = /\.(pdf|html?|txt|md)$/i;
-let staged: string | null = null;
+let staged: string | null = null; // display name
+let stagedPath: string | null = null; // real filesystem path — desktop only, needed by the engine
 let dragDepth = 0;
 
-function stageAttachment(name: string): void {
+function stageAttachment(name: string, path: string | null = null): void {
   staged = name;
+  stagedPath = path;
   attachName.textContent = name;
   attachRow.hidden = false;
 }
 function clearAttachment(): void {
   staged = null;
+  stagedPath = null;
   attachRow.hidden = true;
   fileInput.value = "";
 }
@@ -556,7 +696,7 @@ el(".attach").addEventListener("click", async () => {
   // native dialog in the desktop app; the hidden <input> is the browser fallback
   if (window.oriphim?.openPaper) {
     const picked = await window.oriphim.openPaper();
-    if (picked) stageAttachment(picked.name);
+    if (picked) stageAttachment(picked.name, picked.path);
   } else {
     fileInput.click();
   }
@@ -586,7 +726,8 @@ window.addEventListener("drop", (e) => {
   dropOverlay.hidden = true;
   const f = e.dataTransfer?.files?.[0];
   if (f && ACCEPT.test(f.name)) {
-    stageAttachment(f.name);
+    const path = window.oriphim?.getPathForFile?.(f) ?? null;
+    stageAttachment(f.name, path);
     promptEl.focus();
   } else if (f) {
     addMessage("oriphim", `Can't attach ${f.name} — expecting a PDF, HTML, or text file.`);
@@ -596,6 +737,7 @@ window.addEventListener("drop", (e) => {
 // ---- new run ---------------------------------------------------
 function newRun(): void {
   document.querySelectorAll(".rail-item.is-active").forEach((n) => n.classList.remove("is-active"));
+  exitBrief();
   resetThread();
   clearAttachment();
   setCrumb("new run");
@@ -603,6 +745,7 @@ function newRun(): void {
   sbDot.classList.remove("is-active");
   const entry: Run = { id: "r" + Date.now(), title: "New run", bucket: "Today", projectId: null };
   runs.unshift(entry);
+  activeRunId = entry.id;
   persist();
   renderRail(entry.id);
   promptEl.focus();
@@ -860,6 +1003,29 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// ---- engine status (status bar) ---------------------------------
+const sbEngine = el("#sb-engine");
+async function reflectEngine(): Promise<void> {
+  const bridge = window.oriphim;
+  if (!bridge?.engineStatus) {
+    sbEngine.textContent = "browser preview";
+    document.body.classList.add("engine-offline");
+    return;
+  }
+  try {
+    const st = await bridge.engineStatus();
+    document.body.classList.toggle("engine-offline", !st.online);
+    sbEngine.textContent = !st.online
+      ? "engine offline"
+      : st.modelConfigured
+        ? "engine ready"
+        : "engine up · no API key";
+  } catch {
+    document.body.classList.add("engine-offline");
+    sbEngine.textContent = "engine offline";
+  }
+}
+
 // ---- go -----------------------------------------------------
 if (!mobile()) {
   if (store.get("rail-collapsed", false)) document.body.classList.add("rail-collapsed");
@@ -870,3 +1036,14 @@ autoGrow();
 syncSend();
 reflectToggle("rail");
 reflectToggle("ctx");
+void reflectEngine();
+
+// dev-only QA hook: `oriphimDemoBrief()` in the console renders a sample brief
+// and returns the controller (stripped from production builds).
+if (import.meta.env.DEV) {
+  (window as unknown as { oriphimDemoBrief?: () => BriefController | null }).oriphimDemoBrief =
+    () => {
+      openBrief(sampleBrief(), { attachToRun: false });
+      return briefCtl;
+    };
+}
